@@ -309,7 +309,7 @@ function ProjectModal({ project, onClose }) {
 
           {/* Body */}
           <div >
-            <div className="row g-3 mb-4">
+            <div className="row g-3 m-3">
               {project.modal.images.map((img, i) => (
                 <div className="col-md-6" key={i}>
                   <img
@@ -326,7 +326,7 @@ function ProjectModal({ project, onClose }) {
               ))}
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column" }}>
+            <div className="m-3" style={{ display: "flex", flexDirection: "column" }}>
               {project.modal.learnings.map((item, i) => (
                 <div
                   key={i}
