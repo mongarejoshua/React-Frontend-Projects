@@ -34,20 +34,4 @@ when pulling b4 pushing:
 >> ESC >> :wq
 
 
-
-truehost
-vultr
-cloud
-cpanel
-digitalocean
-gcp
-aws -amazon
-azure
-kenya web expert
-namecheap
-
-shh key 
-
-themeforest
-
 https://fmhy.net/
