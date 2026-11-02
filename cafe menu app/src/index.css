@@ -1,0 +1,53 @@
+:root {
+  font-family: 'DM Sans', sans-serif;
+  color: #38281f;
+  background: #fbf8f2;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  scroll-behavior: smooth;
+  scroll-padding-top: 90px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 360px;
+  margin: 0;
+  background: #fbf8f2;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+a {
+  color: inherit;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+::selection {
+  color: #fffaf1;
+  background: #8a5638;
+}
+
+:focus-visible {
+  outline: 3px solid #bf8957;
+  outline-offset: 3px;
+}
