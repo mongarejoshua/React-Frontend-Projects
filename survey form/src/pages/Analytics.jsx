@@ -1,0 +1,53 @@
+import { useMemo, useState } from 'react'
+import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { useSurveys } from '../context/SurveyContext'
+import StatCard from '../components/StatCard'
+import EmptyState from '../components/EmptyState'
+
+const colors = ['#ff7046', '#7770d8', '#50b897', '#f4b65b', '#68a8d7', '#e58aab']
+export default function Analytics() {
+  const { surveys } = useSurveys()
+  const [surveyId, setSurveyId] = useState('all')
+  const [range, setRange] = useState('all')
+  const filteredSurveys = surveys.filter((survey) => surveyId === 'all' || survey.id === surveyId)
+  const filteredResponses = useMemo(() => filteredSurveys.flatMap((survey) => survey.responses.map((response) => ({ ...response, survey }))).filter((response) => {
+    if (range === 'all') return true
+    return new Date(response.submittedAt) >= new Date(Date.now() - Number(range) * 86400000)
+  }), [filteredSurveys, range])
+  const questionData = filteredSurveys.flatMap((survey) => survey.questions.map((question, index) => ({ question, index })).filter(({ question }) => ['multiple', 'dropdown', 'yesno', 'checkboxes'].includes(question.type)).map(({ question, index }) => {
+    const counts = {}
+    survey.responses.filter((response) => filteredResponses.some((item) => item.id === response.id)).forEach((response) => {
+      const answer = response.answers[index]
+      ;(Array.isArray(answer) ? answer : [answer]).filter(Boolean).forEach((value) => { counts[value] = (counts[value] || 0) + 1 })
+    })
+    const total = Object.values(counts).reduce((sum, value) => sum + value, 0)
+    return { question, survey, chart: Object.entries(counts).map(([name, value]) => ({ name, value, percentage: total ? Math.round(value / total * 100) : 0 })) }
+  }))
+  const trends = Array.from({ length: 7 }, (_, index) => {
+    const day = new Date(Date.now() - (6 - index) * 86400000)
+    return { day: day.toLocaleDateString(undefined, { weekday: 'short' }), responses: filteredResponses.filter((item) => new Date(item.submittedAt).toDateString() === day.toDateString()).length }
+  })
+  const ratingQuestions = filteredSurveys.flatMap((survey) => survey.questions.map((question, index) => ({ survey, question, index })).filter(({ question }) => ['rating', 'linear'].includes(question.type))).map(({ survey, question, index }) => {
+    const values = survey.responses.filter((response) => filteredResponses.some((item) => item.id === response.id)).map((response) => Number(response.answers[index])).filter(Number.isFinite)
+    return { title: question.title, average: values.length ? (values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1) : '—', total: values.length }
+  })
+  const completedRate = filteredResponses.length ? Math.round(filteredResponses.filter((response) => response.survey.questions.every((_, index) => {
+    const value = response.answers[index]
+    return value !== undefined && value !== '' && (!Array.isArray(value) || value.length > 0)
+  })).length / filteredResponses.length * 100) : 0
+  const textResponses = filteredSurveys.flatMap((survey) => survey.questions.map((question, index) => ({ survey, question, index })).filter(({ question }) => ['short', 'long'].includes(question.type)).flatMap(({ survey, question, index }) => survey.responses.filter((response) => filteredResponses.some((item) => item.id === response.id)).map((response) => ({ survey, question, answer: response.answers[index], date: response.submittedAt })).filter((item) => item.answer)))
+  const surveyMix = filteredSurveys.map((survey) => ({ name: survey.title, value: survey.responses.filter((response) => filteredResponses.some((item) => item.id === response.id)).length })).filter((item) => item.value)
+  const answerMix = questionData.flatMap(({ chart }) => chart).reduce((counts, item) => {
+    counts[item.name] = (counts[item.name] || 0) + item.value
+    return counts
+  }, {})
+  const answerDistribution = Object.entries(answerMix).map(([name, value]) => ({ name, value }))
+  return <div className="page-content"><div className="page-heading"><div><div className="eyebrow">THE BIGGER PICTURE</div><h1>Your insights</h1><p>Little patterns can lead to big ideas.</p></div><div className="analytics-filters"><select value={surveyId} onChange={(event) => setSurveyId(event.target.value)}><option value="all">All surveys</option>{surveys.map((survey) => <option value={survey.id} key={survey.id}>{survey.title}</option>)}</select><select value={range} onChange={(event) => setRange(event.target.value)}><option value="all">All time</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option></select></div></div>
+    <div className="stats-grid"><StatCard label="Total responses" value={filteredResponses.length} note="For your selection" icon="bi-chat-square-text" /><StatCard label="Completion rate" value={`${completedRate}%`} note="All questions answered" icon="bi-check2-circle" tone="green" /><StatCard label="Average rating" value={ratingQuestions.length ? (ratingQuestions.reduce((sum, item) => sum + (Number(item.average) || 0), 0) / ratingQuestions.filter((item) => item.average !== '—').length || 0).toFixed(1) : '—'} note="Across rating questions" icon="bi-star" tone="purple" /><StatCard label="Surveys reporting" value={filteredSurveys.length} note="In this view" icon="bi-ui-checks-grid" tone="blue" /></div>
+    {!filteredResponses.length ? <EmptyState title="Insights are on their way" description="Once you receive your first response, your survey insights will show up here." /> : <><div className="analytics-grid"><section className="panel analytics-line"><div className="panel-heading"><div><h2>Response activity</h2><p>Submissions over the last 7 days</p></div><i className="bi bi-three-dots" /></div><div className="chart-area"><ResponsiveContainer width="100%" height="100%"><LineChart data={trends} margin={{ left: -20, right: 5, top: 10 }}><CartesianGrid vertical={false} stroke="#eef0f4" /><XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#9299a7', fontSize: 12 }} /><YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: '#9299a7', fontSize: 12 }} /><Tooltip /><Line type="monotone" dataKey="responses" stroke="#ff7046" strokeWidth={3} dot={{ r: 4, fill: '#ff7046' }} /></LineChart></ResponsiveContainer></div></section>
+      <section className="panel rating-panel"><div className="panel-heading"><div><h2>Rating averages</h2><p>How people feel, at a glance</p></div></div>{ratingQuestions.length ? ratingQuestions.slice(0, 4).map((rating) => <div className="rating-row" key={rating.title}><span>{rating.title}</span><strong><i className="bi bi-star-fill" /> {rating.average}<small> / {rating.total}</small></strong></div>) : <div className="chart-empty">Add a rating or linear scale question to see averages.</div>}</section></div>
+      <h2 className="analytics-section-title">Question breakdown</h2><div className="row g-4">{questionData.map(({ question, survey, chart }) => <div className="col-xl-6" key={`${survey.id}-${question.id}`}><section className="panel breakdown-panel"><div className="panel-heading"><div><span className="survey-category">{survey.title}</span><h2>{question.title}</h2></div><span className="response-count">{chart.reduce((sum, item) => sum + item.value, 0)} answers</span></div>{chart.length ? <div className="breakdown-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={chart} layout="vertical" margin={{ left: 10, right: 15 }}><CartesianGrid horizontal={false} stroke="#eef0f4" /><XAxis type="number" hide allowDecimals={false} /><YAxis dataKey="name" type="category" width={130} axisLine={false} tickLine={false} tick={{ fill: '#586275', fontSize: 12 }} tickFormatter={(name) => `${name} (${chart.find((item) => item.name === name)?.percentage || 0}%)`} /><Tooltip formatter={(value, _, item) => [`${value} responses (${item.payload.percentage}%)`, 'Answers']} /><Bar dataKey="value" fill="#ff7046" radius={[0, 6, 6, 0]} barSize={17} /></BarChart></ResponsiveContainer></div> : <div className="chart-empty">Responses to this question will appear here.</div>}</section></div>)}</div>
+      {(surveyMix.length > 0 || answerDistribution.length > 0) && <div className="distribution-grid">{surveyMix.length > 0 && <section className="panel distribution-panel"><div className="panel-heading"><div><h2>Responses by survey</h2><p>Where your feedback is coming from</p></div></div><div className="distribution-content"><div className="distribution-chart"><ResponsiveContainer width="100%" height="100%"><PieChart><Tooltip /><Pie data={surveyMix} dataKey="value" nameKey="name" innerRadius={42} outerRadius={62} paddingAngle={3}>{surveyMix.map((item, index) => <Cell key={item.name} fill={colors[index % colors.length]} />)}</Pie></PieChart></ResponsiveContainer><span className="donut-total">{filteredResponses.length}<small>responses</small></span></div><div className="distribution-legend">{surveyMix.map((item, index) => <div key={item.name}><i style={{ background: colors[index % colors.length] }} /><span>{item.name}</span><strong>{item.value}</strong></div>)}</div></div></section>}{answerDistribution.length > 0 && <section className="panel distribution-panel"><div className="panel-heading"><div><h2>Answer mix</h2><p>Choice distribution across your surveys</p></div></div><div className="distribution-content"><div className="distribution-chart pie-chart"><ResponsiveContainer width="100%" height="100%"><PieChart><Tooltip /><Pie data={answerDistribution} dataKey="value" nameKey="name" outerRadius={64} paddingAngle={2}>{answerDistribution.map((item, index) => <Cell key={item.name} fill={colors[index % colors.length]} />)}</Pie></PieChart></ResponsiveContainer></div><div className="distribution-legend">{answerDistribution.slice(0, 5).map((item, index) => <div key={item.name}><i style={{ background: colors[index % colors.length] }} /><span>{item.name}</span><strong>{item.value}</strong></div>)}</div></div></section>}</div>}
+      {textResponses.length > 0 && <section className="panel text-responses-panel"><div className="panel-heading"><div><h2>In their own words</h2><p>Open-ended answers from your respondents</p></div><i className="bi bi-chat-quote" /></div><div className="text-response-list">{textResponses.slice(0, 8).map((item, index) => <div className="text-response" key={`${item.survey.id}-${index}`}><p>“{item.answer}”</p><div><span>{item.question.title} · {item.survey.title}</span><small>{new Date(item.date).toLocaleDateString()}</small></div></div>)}</div></section>}</>}
+  </div>
+}
